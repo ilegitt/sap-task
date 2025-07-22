@@ -1,0 +1,24 @@
+replicaCount: 1
+
+image:
+  repository: my-docker-registry/my-application
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+# The password field is replaced with secretArn.
+database:
+  host: ""
+  user: ""
+  secretArn: "" # This will be populated by the CI/CD script
+
+istio:
+  gateway: "istio-system/public-gateway"
+
+# Default annotation for the service account.
+# This MUST be overridden in environment-specific values with the correct IAM role ARN.
+
+serviceAccount:
+  annotations: {}
