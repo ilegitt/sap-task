@@ -1,0 +1,78 @@
+# .github/workflows/deploy.yml
+#
+# This workflow automates the deployment of the application and database
+# using Terraform and Helm. It is designed to be triggered manually,
+# allowing operators to choose the target environment.
+
+name: Deploy Application and Database
+
+# The workflow_dispatch trigger allows for manual execution from the GitHub UI.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment for deployment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+        default: 'dev'
+
+# Permissions are required for the GitHub Actions OIDC token to be issued,
+# which is used for secure authentication with AWS.
+permissions:
+  id-token: write # Required for OIDC.
+  contents: read  # Required to check out the repository.
+
+jobs:
+  deploy:
+    # The job will run on the latest Ubuntu runner provided by GitHub.
+    runs-on: ubuntu-latest
+    # The 'environment' key links to GitHub Environments for protection rules and secrets.
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      # Step 1: Check out the repository code so the runner can access it.
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      # Step 2: Configure AWS credentials using OpenID Connect (OIDC).
+      # This is the most secure method, avoiding long-lived access keys.
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # The ARN of the IAM role that the GitHub Actions runner will assume.
+          # This role should be specific to the environment.
+          role-to-assume: arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/github-actions-deploy-role-${{ github.event.inputs.environment }}
+          aws-region: us-east-1 # Specify your target AWS region.
+
+      # Step 3: Set up the Terraform CLI on the runner.
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0 # Pin to a specific version for consistency.
+
+      # Step 4: Set up the kubectl CLI for Kubernetes interaction.
+      - name: Setup Kubectl CLI
+        uses: azure/setup-kubectl@v3
+
+      # Step 5: Set up the Helm CLI for Kubernetes package management.
+      - name: Setup Helm CLI
+        uses: azure/setup-helm@v3
+
+      # Step 6: Configure the Kubernetes context.
+      # It securely retrieves the kubeconfig from GitHub's encrypted secrets.
+      - name: Configure Kubernetes Context
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > ~/.kube/config
+          chmod 600 ~/.kube/config
+        # This secret must be configured in your repository's settings for each environment.
+
+      # Step 7: Execute the main deployment script.
+      # The script contains the core logic for Terraform and Helm.
+      # The environment selected in the UI is passed as an argument.
+      - name: Run Deployment Script
+        run: ./deploy.sh ${{ github.event.inputs.environment }}
