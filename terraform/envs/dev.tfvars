@@ -1,4 +1,4 @@
-# Environment-specific variables for 'development'. The password is no longer here.
+# Environment-specific variables for 'development'. 
 
 environment              = "dev"
 db_instance_class        = "db.t3.micro"
