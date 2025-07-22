@@ -1,0 +1,7 @@
+image:
+  tag: "2.5.1"
+replicaCount: 3
+serviceAccount:
+  annotations:
+    # IMPORTANT: Replace with the ARN of the IAM role for your PROD service account.
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/my-app-app-prod-role"
