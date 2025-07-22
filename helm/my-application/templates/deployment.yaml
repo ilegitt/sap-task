@@ -1,0 +1,56 @@
+# The deployment uses the ServiceAccount and consumes secrets from the SecretProviderClass-managed secret.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "my-application.fullname" . }}
+  labels:
+    {{- include "my-application.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "my-application.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "my-application.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "my-application.fullname" . }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: DB_HOST
+              value: {{ .Values.database.host | quote }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "my-application.fullname" . }}-db-creds
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "my-application.fullname" . }}-db-creds
+                  key: password
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+      # The CSI driver requires the volume to be mounted in the pod
+      # to trigger the secret sync operation.
+      volumes:
+        - name: secrets-store-inline
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: {{ include "my-application.fullname" . }}
